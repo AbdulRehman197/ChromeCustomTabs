@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">Chrome Custom Tabs</string>
+    <string name="asset_statements">
+        [{
+            \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+            \"target\": {
+                \"namespace\": \"web\",
+                \"site\": \"https://twa-app-741b9.web.app/\"}
+        }],
+             [{
+            \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+            \"target\": {
+                \"namespace\": \"web\",
+                \"site\": \"https://twa-sample-app.web.app/\"}
+        }]
+    </string>
+</resources>
