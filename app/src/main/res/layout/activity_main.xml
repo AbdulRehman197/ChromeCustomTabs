@@ -31,9 +31,34 @@
         android:layout_height="wrap_content"
         android:text="Open App 2" />
 
+    <Button
+        android:id="@+id/googleSignout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="SignOut" />
+
+    <Button
+        android:id="@+id/upload"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Upload" />
+    <Button
+        android:id="@+id/loadImage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="LoadImage" />
+
     <ImageView
-        android:id="@+id/image"
+        android:id="@+id/imageView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         tools:srcCompat="@tools:sample/avatars" />
+
+    <TextView
+        android:id="@+id/base64String"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="TextView" />
+
+
 </LinearLayout>

@@ -7,7 +7,12 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
+    <uses-permission android:name="android.permission.GET_ACCOUNTS" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission
+        android:name="android.permission.READ_MEDIA_IMAGES"
+        tools:ignore="SelectedPhotoAccess" />
 
     <application
         android:allowBackup="true"
@@ -15,10 +20,41 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:requestLegacyExternalStorage="true"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.ChromeCustomTabs"
-        tools:targetApi="31">
+        android:theme="@style/Theme.ChromeCustomTabs">
+        <activity
+            android:name=".LoginGoogleAuth"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".Login"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".googleSignIn"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".googledrive"
+            android:exported="false" />
+
         <meta-data
             android:name="asset_statements"
             android:resource="@string/asset_statements" />
@@ -26,21 +62,26 @@
         <activity
             android:name=".MainActivity"
             android:exported="true">
-            <!--        </activity>-->
-            <!--        <activity android:name="com.google.androidbrowserhelper.trusted.LauncherActivity" android:exported="true">-->
+
+            <!-- </activity> -->
+            <!-- <activity android:name="com.google.androidbrowserhelper.trusted.LauncherActivity" android:exported="true"> -->
+
 
             <!-- Edit android:value to change the url opened by the Trusted Web Activity -->
-            <!--            <meta-data-->
-            <!--                android:name="android.support.customtabs.trusted.DEFAULT_URL"-->
-            <!--                android:value="https://sapphire-selective-duckling.glitch.me" />-->
-            <!--            <meta-data-->
-            <!--                android:name="android.support.customtabs.trusted.DEFAULT_URL"-->
-            <!--                android:value="https://twa-app-741b9.web.app" />-->
+            <!-- <meta-data -->
+            <!-- android:name="android.support.customtabs.trusted.DEFAULT_URL" -->
+            <!-- android:value="https://sapphire-selective-duckling.glitch.me" /> -->
+            <!-- <meta-data -->
+            <!-- android:name="android.support.customtabs.trusted.DEFAULT_URL" -->
+            <!-- android:value="https://twa-app-741b9.web.app" /> -->
             <!-- This intent-filter adds the Trusted Web Activity to the Android Launcher -->
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
+            <!-- <intent-filter> -->
+            <!-- <action android:name="android.intent.action.MAIN" /> -->
+
+
+            <!-- <category android:name="android.intent.category.LAUNCHER" /> -->
+            <!-- </intent-filter> -->
+
 
             <!--
               This intent-filter allows the Trusted Web Activity to handle Intents to open
@@ -52,12 +93,13 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <!-- Edit android:host to handle links to the target URL-->
+                <!-- Edit android:host to handle links to the target URL -->
                 <data
                     android:host="https://twa-app-741b9.web.app/"
                     android:scheme="https" />
             </intent-filter>
         </activity>
+
         <service
             android:name="androidx.browser.customtabs.PostMessageService"
             android:exported="true" />
