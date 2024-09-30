@@ -4,6 +4,8 @@ package com.example.chromecustomtabs
 //import androidx.browser.customtabs.CustomTabsService.FilePurpose
 
 
+//import kotlin.io.encoding.Base64
+
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ComponentName
@@ -14,7 +16,6 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
 import android.util.Log
 import android.widget.Button
 import android.widget.Toast
@@ -29,8 +30,6 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.room.Room
-import com.example.chromecustomtabs.DBHelper.Companion.ID_COL
-import com.example.chromecustomtabs.DBHelper.Companion.SHA_VALUE
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -50,12 +49,12 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.FileOutputStream
-import java.io.IOException
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+import java.util.Comparator
 import kotlin.io.encoding.Base64
-//import java.util.Base64
-
 import kotlin.io.encoding.ExperimentalEncodingApi
+
 
 @Suppress("DEPRECATION")
 class MainActivity : AppCompatActivity() {
@@ -73,8 +72,10 @@ class MainActivity : AppCompatActivity() {
      var fileBase64Decoded =  byteArrayOf()
 
     var setString = mutableListOf<String>()
-    var fileChunks = mutableMapOf<String, MutableList<String>>()
-
+    var fileChunks = mutableMapOf<String, MutableMap<String,String>>()
+    var unCompletedSha = mutableListOf<String>()
+    var corruptedSha = mutableListOf<String>()
+    var missingPakects = mutableListOf<String>()
     // This origin is going to be validated via DAL, please see
 // (https://developer.chrome.com/docs/android/post-message-twa#add_the_app_to_web_validation),
 // it has to either start with http or https.
@@ -83,7 +84,7 @@ class MainActivity : AppCompatActivity() {
     var mValidated = false
     private lateinit var googleSignInClient: GoogleSignInClient
     val tAG = "PostMessageDemo"
-
+    var isMissing = false
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -174,7 +175,7 @@ class MainActivity : AppCompatActivity() {
 
             // If this fails:
             // - Have you included PostMessageService in your AndroidManifest.xml?
-            val result = mSession?.requestPostMessageChannel(targetOrigin)
+            val result = mSession?.requestPostMessageChannel(uRL)
             Log.d(tAG, "Requested Post Message Channel: $result")
         }
 
@@ -208,7 +209,7 @@ class MainActivity : AppCompatActivity() {
                       }catch (e: Exception){
                           Log.d(tAG + "value not found",  e.toString())
                           db.fileshaDao().insertSha(FIleSHA(0,"filedemo", messagesList[1]))
-                          mSession?.postMessage("sha256Exist|false",null)
+                          mSession?.postMessage("sha256Exist|${messagesList[1]}|false",null)
                       }
 
 
@@ -218,30 +219,51 @@ class MainActivity : AppCompatActivity() {
 //                    mSession?.postMessage("false|",null)
                 }
                 "startsending" -> {
-                    var singleChunkData = mutableListOf<String>()
+                    val singleChunkData = mutableMapOf<String,String>()
                     fileChunks[messagesList[1]] = singleChunkData
-                    mSession?.postMessage("isListReady|true",null)
+                    mSession?.postMessage("isListReady|${messagesList[1]}|true",null)
+
 
                 }
                 "packet" -> {
+
                     Log.d(tAG+"packet", messagesList[3])
                     Log.d(tAG+"packet", messagesList[4])
+
+//                        lifecycleScope.launch(Dispatchers.IO){
+                          val isExistElement = fileChunks[messagesList[5]]?.containsKey(messagesList[3])
+                                if(isExistElement == false) {
+                                    fileChunks[messagesList[5]]?.put(messagesList[3], messagesList[6])
+                                }
+
+//                    }
 
 
                 }
                 "completesending" -> {
+                    Log.d(tAG+"currentchunkno", messagesList[1])
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        checkPackets(messagesList[1],messagesList[2])
+                    }
                     mSession?.postMessage("completesending|true",null)
+
+
 
                 }
                 "filename" -> {
                     Log.d(tAG+"filename", messagesList[1])
-                    mSession?.postMessage("filecompleted|",null)
+//                    mSession?.postMessage("filecompleted|",null)
+                    Log.d(tAG + "packetList",fileChunks.size.toString())
+                    fileChunks.clear()
                 }
                 "deleteDB" -> {
                     Log.d(tAG + "delete", "Deleted")
                     lifecycleScope.launch {
                         db.fileshaDao().deleteAll()
                     }
+                }
+                "demo" -> {
+                    Log.d(tAG, "demo message for cheking port")
                 }
                 else -> { // Note the block
                     print("x is neither 1 nor 2")
@@ -436,35 +458,100 @@ class MainActivity : AppCompatActivity() {
 
 
         }
+
+        @SuppressLint("SuspiciousIndentation")
+        private fun checkPackets(sha256Base64: String, packetListSize: String) {
+          val sha256: String =   parseBase64toSha256(sha256Base64)
+          val packetsMap = fileChunks[sha256Base64]?.toSortedMap(compareBy { it.toInt() })
+
+            if(packetsMap?.size == packetListSize.toInt())
+//            if(isMissing)
+            {
+
+                Log.d(tAG + "List Length",  "List Length is ok ${packetsMap.keys}?.size")
+                val packetListBase64String = packetsMap.values.joinToString("")
+                Log.d(tAG ,"List Length is packetListBase64String ${packetsMap.keys.indices}?.size")
+                val chunkSha256Bytes = parseBase64toByteArray(packetListBase64String)
+                val chunkSha256String = sha256hash(chunkSha256Bytes)
+                Log.d(tAG + "orginal sha256", sha256)
+                Log.d(tAG + "chunk sha256", chunkSha256String)
+                if(sha256 == chunkSha256String){
+                        Log.d(tAG, "Chunk is ok")
+                    mSession?.postMessage("completeChunkPackets|$sha256Base64",null)
+//                    mSession?.postMessage("completesending|$sha256Base64",null)
+
+                }else{
+                    corruptedSha.add(sha256Base64)
+                }
+
+            }else{
+
+//                isMissing = true
+           if(packetsMap?.size!! > 0) {
+               packetsMap.keys.indices.forEach { index ->
+                   if(!packetsMap.containsKey(index.toString())){
+                       // for test purpose
+//                        if(index == 8){
+                       missingPakects.add(index.toString())
+                       Log.d(tAG + "check index", index.toString())
+                       mSession?.postMessage("missingPacket|$packetListSize|$sha256Base64|${missingPakects}",null)
+                   }
+
+               }
+           }
+
+                unCompletedSha.add(sha256Base64)
+            }
+
+        }
+
+        private fun parseBase64toSha256(base64String: String): String {
+            val sha256ByteDecode: ByteArray =   parseBase64toByteArray(base64String)
+            return String(sha256ByteDecode, Charsets.UTF_8)
+
+        }
+
+        private fun parseBase64toByteArray(sha256Base64: String): ByteArray {
+            val source =  sha256Base64.toByteArray()
+             return Base64.decode(source,0,source.size)
+        }
+
+        private fun splitMessage(message: String): List<String> {
+            return  message.split("|")
+        }
+
+        private fun sha256hash(bytes: ByteArray): String {
+            val md = MessageDigest.getInstance("SHA-256")
+            val digest = md.digest(bytes)
+            return digest.fold("") { str, it -> str + "%02x".format(it) }
+        }
     }
 
-    private fun splitMessage(message: String): List<String> {
-      return  message.split("|")
-    }
+
 
     // Function to decode Base64 and SHA256 hash check
     @OptIn(ExperimentalEncodingApi::class, ExperimentalUnsignedTypes::class)
     @RequiresApi(Build.VERSION_CODES.O)
-    fun processChunks(chunks: MutableList<String>): ByteArray {
-        val byteArrays = mutableListOf<ByteArray>()
-
-        // Process chunks in groups of 16
-        val groupSize = 22
-        for (i in chunks.indices step groupSize) {
-            val group = chunks.subList(i, (i + groupSize).coerceAtMost(chunks.size))
-//            Log.d(tAG+ "processChunks fun 1",group.size.toString())
-            val concatenatedBase64 = processGroup(group)
-//            Log.d(tAG+ "base64chunksize",concatenatedBase64.length.toString())
-//            val decodedBytes = Base64.getDecoder().decode(concatenatedBase64)
-            val decodedBytes = Base64.decode(concatenatedBase64.toByteArray(),0,concatenatedBase64.length)
-
-//            Log.d(tAG+ "single array size", decodedBytes.size.toString())
-            byteArrays.add(decodedBytes)
-        }
-        Log.d(tAG+ "final ArrayByte", byteArrays.flatten().size.toString())
-        // Combine all byte arrays into a single byte array
-        return byteArrays.flatten()
-    }
+//    fun processChunks(chunks: MutableList<String>): ByteArray {
+//        val byteArrays = mutableListOf<ByteArray>()
+//
+//        // Process chunks in groups of 16
+//        val groupSize = 22
+//        for (i in chunks.indices step groupSize) {
+//            val group = chunks.subList(i, (i + groupSize).coerceAtMost(chunks.size))
+////            Log.d(tAG+ "processChunks fun 1",group.size.toString())
+//            val concatenatedBase64 = processGroup(group)
+////            Log.d(tAG+ "base64chunksize",concatenatedBase64.length.toString())
+////            val decodedBytes = Base64.getDecoder().decode(concatenatedBase64)
+//            val decodedBytes = Base64.decode(concatenatedBase64.toByteArray(),0,concatenatedBase64.length)
+//
+////            Log.d(tAG+ "single array size", decodedBytes.size.toString())
+//            byteArrays.add(decodedBytes)
+//        }
+//        Log.d(tAG+ "final ArrayByte", byteArrays.flatten().size.toString())
+//        // Combine all byte arrays into a single byte array
+//        return byteArrays.flatten()
+//    }
 
     // Helper function to process a group of chunks
     private fun processGroup(group: MutableList<String>): String {
